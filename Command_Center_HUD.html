@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ocen Hospital — Bed Capacity Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#05070C; --bg2:#0A0E17; --panel:rgba(16,20,31,0.62); --panel-solid:#0F1420;
+  --border:rgba(0,229,255,0.14); --border-soft:rgba(255,255,255,0.06);
+  --teal:#00E5FF; --red:#FF3366; --amber:#FF9900; --green:#00E676;
+  --text:#E9EEF5; --muted:#7C879C; --muted2:#4C5568;
+  --font-display:'Space Grotesk',sans-serif; --font-body:'Inter',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{background:var(--bg); color:var(--text); font-family:var(--font-body); overflow-x:hidden;}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(ellipse 900px 500px at 12% -10%, rgba(0,229,255,0.09), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 105% 10%, rgba(255,51,102,0.07), transparent 55%),
+    radial-gradient(ellipse 900px 600px at 50% 120%, rgba(0,230,118,0.05), transparent 60%),
+    var(--bg);
+  padding: 22px clamp(14px,3vw,40px) 60px;
+}
+.grid-overlay{
+  position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.35;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size:42px 42px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 20%, black, transparent);
+}
+.wrap{position:relative; z-index:1; max-width:1440px; margin:0 auto;}
+
+/* ---------- HEADER ---------- */
+header{
+  display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;
+  padding-bottom:18px; margin-bottom:22px; border-bottom:1px solid var(--border-soft); position:relative;
+}
+header::after{
+  content:''; position:absolute; left:0; right:0; bottom:-1px; height:1px;
+  background:linear-gradient(90deg, transparent, var(--teal), transparent);
+  animation: scan 5s linear infinite;
+}
+@keyframes scan{ 0%{transform:translateX(-100%);} 100%{transform:translateX(100%);} }
+.brand{display:flex; align-items:center; gap:14px;}
+.brand-mark{
+  width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, rgba(0,229,255,0.18), rgba(0,229,255,0.02));
+  border:1px solid var(--border); font-size:22px; box-shadow:0 0 22px rgba(0,229,255,0.15) inset;
+}
+.brand h1{font-family:var(--font-display); font-weight:700; font-size:22px; letter-spacing:.3px;}
+.brand p{font-family:var(--font-mono); font-size:11px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-top:2px;}
+.header-right{display:flex; align-items:center; gap:22px;}
+.clock{font-family:var(--font-mono); font-size:13px; color:var(--muted); text-align:right;}
+.clock b{color:var(--text); display:block; font-size:15px;}
+.status-pill{
+  display:flex; align-items:center; gap:10px; padding:9px 18px; border-radius:999px; font-family:var(--font-mono);
+  font-size:12.5px; font-weight:600; letter-spacing:.5px; border:1px solid; transition:all .4s ease;
+}
+.pulse-dot{width:8px; height:8px; border-radius:50%; position:relative;}
+.pulse-dot::after{content:''; position:absolute; inset:-6px; border-radius:50%; border:1.5px solid currentColor; animation:pulse 1.8s ease-out infinite;}
+@keyframes pulse{0%{transform:scale(.4); opacity:1;} 100%{transform:scale(1.9); opacity:0;}}
+
+/* ---------- KPI STRIP ---------- */
+.kpis{display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px;}
+.kpi{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:14px; padding:16px 18px;
+  backdrop-filter:blur(14px); position:relative; overflow:hidden; transition:border-color .3s;
+}
+.kpi:hover{border-color:var(--border);}
+.kpi .label{font-family:var(--font-mono); font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; margin-bottom:8px;}
+.kpi .value{font-family:var(--font-display); font-size:30px; font-weight:700; line-height:1;}
+.kpi .delta{font-family:var(--font-mono); font-size:11px; margin-top:6px; color:var(--muted);}
+.kpi .spark{position:absolute; right:10px; bottom:10px; opacity:.5;}
+
+/* ---------- PANEL SHELL ---------- */
+.panel{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:16px; padding:20px 22px 22px;
+  backdrop-filter:blur(14px); margin-bottom:18px; position:relative;
+}
+.panel-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; flex-wrap:wrap; gap:8px;}
+.panel-head h2{font-family:var(--font-display); font-size:15px; letter-spacing:.4px; color:var(--text); display:flex; align-items:center; gap:9px;}
+.panel-head h2 .tag{color:var(--teal); font-family:var(--font-mono); font-size:11px; border:1px solid var(--border); padding:2px 8px; border-radius:6px; letter-spacing:1px;}
+.panel-head .sub{font-family:var(--font-mono); font-size:10.5px; color:var(--muted2); text-transform:uppercase; letter-spacing:.8px;}
+
+/* ---------- BED MATRIX (signature element) ---------- */
+.matrix-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+@media(max-width:1100px){.matrix-grid{grid-template-columns:repeat(2,1fr);}}
+.ward-card{
+  background:rgba(255,255,255,0.015); border:1px solid var(--border-soft); border-radius:12px; padding:13px 14px;
+  transition:transform .3s, border-color .3s;
+}
+.ward-card:hover{transform:translateY(-2px);}
+.ward-card .wc-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:9px;}
+.ward-card .wc-name{font-family:var(--font-display); font-weight:600; font-size:13px;}
+.ward-card .wc-rate{font-family:var(--font-mono); font-weight:700; font-size:14px;}
+.bed-dots{display:grid; grid-template-columns:repeat(9,1fr); gap:4px; margin-bottom:8px;}
+.bed-dot{
+  aspect-ratio:1; border-radius:3px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.06);
+  transition:all .5s cubic-bezier(.4,0,.2,1);
+}
+.bed-dot.on{box-shadow:0 0 7px 0 currentColor;}
+.bed-dot.overflow{animation:overflowBlink 1.2s ease-in-out infinite;}
+@keyframes overflowBlink{0%,100%{opacity:1;} 50%{opacity:.35;}}
+.wc-foot{display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:var(--muted);}
+.wc-foot .board{display:flex; align-items:center; gap:5px;}
+.board-dot{width:6px; height:6px; border-radius:50%; background:var(--red); box-shadow:0 0 6px var(--red);}
+
+/* ---------- TWO COL LAYOUT ---------- */
+.cols2{display:grid; grid-template-columns:1.5fr 1fr; gap:18px;}
+.cols2b{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+@media(max-width:1000px){.cols2,.cols2b{grid-template-columns:1fr;}}
+
+/* ---------- GAUGE ---------- */
+.gauge-wrap{display:flex; flex-direction:column; align-items:center; padding-top:6px;}
+.gauge-read{font-family:var(--font-mono); font-size:34px; font-weight:700; margin-top:-18px;}
+.gauge-sub{font-family:var(--font-mono); font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;}
+.mini-stats{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; width:100%;}
+.mini-stat{background:rgba(255,255,255,0.02); border:1px solid var(--border-soft); border-radius:10px; padding:10px 12px; text-align:center;}
+.mini-stat .n{font-family:var(--font-mono); font-weight:700; font-size:19px;}
+.mini-stat .l{font-family:var(--font-mono); font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin-top:3px;}
+
+/* ---------- FLOW DIAGRAM ---------- */
+.flow-stage{display:flex; align-items:center; gap:14px; margin-bottom:2px;}
+.flow-label{width:150px; font-family:var(--font-mono); font-size:11px; color:var(--muted); text-align:right; flex-shrink:0;}
+.flow-bar-track{flex:1; height:34px; background:rgba(255,255,255,0.03); border-radius:8px; overflow:hidden; position:relative;}
+.flow-bar-fill{height:100%; border-radius:8px; display:flex; align-items:center; justify-content:flex-end; padding-right:12px;
+  font-family:var(--font-mono); font-weight:700; font-size:12px; transition:width 1.1s cubic-bezier(.16,1,.3,1);}
+.flow-connector{width:150px; flex-shrink:0;}
+
+/* ---------- SLIDERS ---------- */
+.control{margin-bottom:20px;}
+.control-top{display:flex; justify-content:space-between; margin-bottom:8px; font-family:var(--font-mono); font-size:11.5px;}
+.control-top .cname{color:var(--muted); text-transform:uppercase; letter-spacing:.8px;}
+.control-top .cval{font-weight:700; font-size:14px;}
+input[type=range]{
+  -webkit-appearance:none; width:100%; height:6px; border-radius:4px; outline:none; cursor:pointer;
+  background:linear-gradient(90deg, var(--teal) 0%, var(--teal) var(--fill,0%), rgba(255,255,255,0.08) var(--fill,0%));
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--teal);
+  box-shadow:0 0 12px var(--teal), 0 0 0 4px rgba(0,229,255,0.15); cursor:pointer; border:2px solid #05070C;
+}
+.status-card{
+  border-radius:12px; padding:16px 18px; text-align:center; font-family:var(--font-mono); font-weight:700;
+  font-size:15px; letter-spacing:.5px; border:1px solid; margin-bottom:18px; transition:all .5s ease;
+}
+.compare-bars{display:flex; flex-direction:column; gap:9px; margin-top:6px;}
+.cbar-row{display:flex; align-items:center; gap:10px;}
+.cbar-name{width:98px; font-family:var(--font-mono); font-size:10.5px; color:var(--muted); flex-shrink:0;}
+.cbar-track{flex:1; height:16px; background:rgba(255,255,255,0.03); border-radius:5px; position:relative; overflow:visible;}
+.cbar-base{position:absolute; top:0; left:0; height:100%; background:rgba(255,255,255,0.14); border-radius:5px; transition:width .6s;}
+.cbar-sim{position:absolute; top:-3px; left:0; height:22px; border-radius:6px; opacity:.85; transition:width .6s, background .6s;
+  box-shadow:0 0 10px 0 currentColor;}
+
+footer{text-align:center; font-family:var(--font-mono); font-size:10.5px; color:var(--muted2); letter-spacing:.6px; margin-top:26px;}
+svg text{font-family:var(--font-mono);}
+.legend{display:flex; gap:16px; font-family:var(--font-mono); font-size:10px; color:var(--muted); flex-wrap:wrap;}
+.legend span{display:inline-flex; align-items:center; gap:6px;}
+.legend i{width:9px; height:9px; border-radius:2px; display:inline-block;}
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">🏥</div>
+      <div>
+        <h1> Ocen HOSPITAL</h1>
+        <p>Bed Capacity Command Center</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">SYNCING…<b id="clockTime">--:--:--</b></div>
+      <div class="status-pill" id="statusPill">
+        <span class="pulse-dot" id="pulseDot"></span>
+        <span id="statusText">STATUS NORMAL</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpiStrip"></div>
+
+  <!-- SIGNATURE: LIVE BED MATRIX -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Situational Awareness <span class="tag">LIVE BED MATRIX</span></h2>
+      <div class="legend">
+        <span><i style="background:var(--green);box-shadow:0 0 6px var(--green)"></i>&lt;75% occupied</span>
+        <span><i style="background:var(--amber);box-shadow:0 0 6px var(--amber)"></i>75–84%</span>
+        <span><i style="background:var(--red);box-shadow:0 0 6px var(--red)"></i>≥85% critical</span>
+        <span><i style="background:transparent;border:1px dashed var(--red)"></i>boarding overflow</span>
+      </div>
+    </div>
+    <div class="matrix-grid" id="matrixGrid"></div>
+  </div>
+
+  <div class="cols2">
+    <!-- FORECAST -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2>The Forecast <span class="tag">7-DAY PREDICTIVE ADMISSIONS</span></h2>
+        <div class="sub">Holt-Winters · Trend + Weekly Seasonality</div>
+      </div>
+      <svg id="forecastSvg" viewBox="0 0 760 300" style="width:100%; height:auto; overflow:visible;"></svg>
+      <div class="legend" style="margin-top:10px;">
+        <span><i style="background:var(--muted)"></i>Historical actuals</span>
+        <span><i style="background:var(--teal);box-shadow:0 0 6px var(--teal)"></i>Predicted surge</span>
+        <span><i style="background:rgba(0,229,255,0.25)"></i>95% confidence interval</span>
+        <span><i style="background:var(--amber)"></i>Scheduled elective surgeries</span>
+      </div>
+    </div>
+
+    <!-- ER TRIAGE GAUGE -->
+    <div class="panel">
+      <div class="panel-head"><h2>ER Triage <span class="tag">LIVE</span></h2></div>
+      <div class="gauge-wrap">
+        <svg id="gaugeSvg" viewBox="0 0 220 130" style="width:210px;"></svg>
+        <div class="gauge-read" id="gaugeRead" style="color:var(--teal)">--</div>
+        <div class="gauge-sub">avg wait, minutes</div>
+        <div class="mini-stats">
+          <div class="mini-stat"><div class="n" id="boardingN" style="color:var(--red)">-</div><div class="l">ER Boarding</div></div>
+          <div class="mini-stat"><div class="n" id="queueN" style="color:var(--amber)">-</div><div class="l">Queue Density</div></div>
+          <div class="mini-stat" style="grid-column:1/3;"><div class="n" id="redN" style="color:var(--red)">-</div><div class="l">Red-Triage Awaiting Bed</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols2b">
+    <!-- DISCHARGE PIPELINE -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Supply &amp; Flow <span class="tag">DISCHARGE PIPELINE</span></h2>
+      </div>
+      <div id="flowStages"></div>
+      <div class="panel-head" style="margin-top:20px;"><h2 style="font-size:12.5px; color:var(--muted);">RANKED BOTTLENECKS (AVG CLEARANCE HOURS)</h2></div>
+      <div id="bottleneckBars"></div>
+    </div>
+
+    <!-- SCENARIO PLANNER -->
+    <div class="panel">
+      <div class="panel-head"><h2>Surge Scenario Planner <span class="tag">INTERACTIVE</span></h2></div>
+
+      <div class="control">
+        <div class="control-top">
+          <span class="cname">🚨 MCI Emergency Arrivals</span>
+          <span class="cval" id="mciVal" style="color:var(--red)">+0</span>
+        </div>
+        <input type="range" id="mciSlider" min="0" max="50" value="0" style="--fill:0%">
+      </div>
+
+      <div class="control">
+        <div class="control-top">
+          <span class="cname">🏃 Discharge Velocity</span>
+          <span class="cval" id="dvVal" style="color:var(--green)">0%</span>
+        </div>
+        <input type="range" id="dvSlider" min="-20" max="20" value="0" style="--fill:50%">
+      </div>
+
+      <div class="status-card" id="scenarioCard">✅ STATUS NORMAL</div>
+
+      <div class="panel-head"><h2 style="font-size:12.5px; color:var(--muted);">BASELINE VS PROJECTED OCCUPANCY</h2></div>
+      <div class="compare-bars" id="compareBars"></div>
+    </div>
+  </div>
+
+  <footer>HOSPITAL BED CAPACITY COMMAND CENTER </footer>
+</div>
+
+<script>
+/* ============================== DATA ENGINE ============================== */
+const COLORS = {teal:'#00E5FF', red:'#FF3366', amber:'#FF9900', green:'#00E676', muted:'#7C879C'};
+
+const WARDS = [
+  {name:'ICU', cap:12, occ:9, red:2, amber:5, green:8, boarding:5, wait:142, alos:4.8, bottleneck:'Billing Clearance'},
+  {name:'HDU', cap:10, occ:7, red:1, amber:4, green:6, boarding:2, wait:98, alos:3.5, bottleneck:'Pharmacy Clearance'},
+  {name:'Surgical A', cap:34, occ:23, red:0, amber:3, green:7, boarding:1, wait:76, alos:3.1, bottleneck:'Billing Clearance'},
+  {name:'Surgical B', cap:30, occ:22, red:1, amber:2, green:6, boarding:2, wait:88, alos:3.4, bottleneck:'Physician Sign-off'},
+  {name:'Maternity', cap:40, occ:24, red:0, amber:2, green:9, boarding:0, wait:54, alos:2.2, bottleneck:'Transport'},
+  {name:'Pediatrics', cap:45, occ:27, red:0, amber:3, green:6, boarding:1, wait:63, alos:2.9, bottleneck:'Pharmacy Clearance'},
+  {name:'Medical Male', cap:38, occ:29, red:1, amber:4, green:5, boarding:4, wait:121, alos:4.1, bottleneck:'Billing Clearance'},
+  {name:'Medical Female', cap:36, occ:26, red:0, amber:3, green:7, boarding:2, wait:104, alos:3.9, bottleneck:'Pharmacy Clearance'},
+];
+
+const MCI_WEIGHT = {'ICU':0.22,'HDU':0.14,'Surgical A':0.20,'Surgical B':0.16,'Maternity':0.0,'Pediatrics':0.03,'Medical Male':0.14,'Medical Female':0.11};
+
+// 30-day admissions history with weekly seasonality + slow trend
+const HIST = (()=>{
+  const wf=[1.05,1.15,1.10,1.08,1.00,0.75,0.70]; // Mon..Sun
+  const out=[]; const today=new Date();
+  for(let i=29;i>=0;i--){
+    const d=new Date(today); d.setDate(d.getDate()-i);
+    const dow=(d.getDay()+6)%7; // Mon=0
+    const trend=(29-i)*0.2;
+    const noise=Math.sin(i*12.9)*3.1 + Math.cos(i*3.7)*1.6;
+    out.push({date:d, adm:Math.max(5,Math.round(34*wf[dow]+trend+noise))});
+  }
+  return out;
+})();
+const FORECAST = (()=>{
+  const wf=[1.05,1.15,1.10,1.08,1.00,0.75,0.70];
+  const level = HIST.slice(-7).reduce((a,b)=>a+b.adm,0)/7;
+  const trend = 0.28;
+  const resid = 6.7;
+  const out=[]; const last=HIST[HIST.length-1].date;
+  for(let i=1;i<=7;i++){
+    const d=new Date(last); d.setDate(d.getDate()+i);
+    const dow=(d.getDay()+6)%7;
+    const f=(level+trend*i)*wf[dow];
+    const ci=1.96*resid*Math.sqrt(i);
+    out.push({date:d, fc:f, lo:Math.max(0,f-ci), hi:f+ci, elective: [7,11,5,13,9,4,8][i-1]});
+  }
+  return out;
+})();
+
+const BOTTLENECKS = [
+  {stage:'Transport', hrs:1.4},
+  {stage:'Physician Sign-off', hrs:2.0},
+  {stage:'Pharmacy Clearance', hrs:3.1},
+  {stage:'Billing Clearance', hrs:5.4},
+].sort((a,b)=>a.hrs-b.hrs);
+
+const totalOccBase = WARDS.reduce((a,w)=>a+w.occ,0);
+const FLOW = [
+  {label:'Admitted', val: totalOccBase},
+  {label:'Stable in Ward', val: Math.round(totalOccBase*0.85)},
+  {label:'Pending Clearance', val: Math.round(totalOccBase*0.85*0.5)},
+  {label:'Discharged', val: Math.round(totalOccBase*0.85*0.5*0.62)},
+];
+
+/* ============================== HELPERS ============================== */
+function occColor(rate){ return rate>=85?COLORS.red : rate>=75?COLORS.amber : COLORS.green; }
+function fmt(n){ return n.toLocaleString(); }
+function svgns(tag){ return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+
+/* ============================== CLOCK ============================== */
+function tickClock(){
+  const now=new Date();
+  document.getElementById('clock').firstChild.textContent = 'LIVE SYNC ';
+  document.getElementById('clockTime').textContent = now.toLocaleString('en-US',{weekday:'short', month:'short', day:'numeric'}) + '  ' + now.toLocaleTimeString('en-GB');
+}
+tickClock(); setInterval(tickClock,1000);
+
+/* ============================== KPI STRIP ============================== */
+function renderKPIs(sysRate, occupied, capacity, icuRate, boarding){
+  const el=document.getElementById('kpiStrip');
+  const items=[
+    {label:'Total Beds', value:fmt(capacity), delta:'8 wards online', color:'var(--text)'},
+    {label:'Occupied (Simulated)', value:fmt(occupied), delta:(occupied-totalOccBase>=0?'+':'')+(occupied-totalOccBase)+' vs baseline', color:'var(--teal)'},
+    {label:'System Occupancy', value:sysRate.toFixed(1)+'%', delta: (sysRate>=85?'above threshold':'within range'), color: occColor(sysRate)},
+    {label:'ICU Projected', value:icuRate.toFixed(1)+'%', delta: icuRate>100?'overflow / boarding':'nominal', color: icuRate>=85?COLORS.red:COLORS.teal},
+    {label:'ER Boarding', value:fmt(boarding), delta:'patients awaiting transfer', color:'var(--red)'},
+  ];
+  el.innerHTML = items.map(it=>`
+    <div class="kpi">
+      <div class="label">${it.label}</div>
+      <div class="value" style="color:${it.color}">${it.value}</div>
+      <div class="delta">${it.delta}</div>
+    </div>`).join('');
+}
+
+/* ============================== BED MATRIX ============================== */
+function renderMatrix(simWards){
+  const el=document.getElementById('matrixGrid');
+  el.innerHTML='';
+  simWards.forEach(w=>{
+    const rate = w.simOcc/w.cap*100;
+    const col = occColor(rate);
+    const card=document.createElement('div');
+    card.className='ward-card';
+    card.style.borderColor = rate>=95? 'rgba(255,51,102,0.5)' : 'var(--border-soft)';
+
+    const dotsCount = Math.max(w.cap, 27);
+    let dotsHtml='';
+    for(let i=0;i<Math.min(dotsCount,36);i++){
+      const isOverflow = i>=w.cap;
+      const isOn = i < w.simOcc;
+      let color = 'transparent';
+      let cls='bed-dot';
+      if(isOverflow && i < w.simOcc){ cls+=' on overflow'; color=COLORS.red; }
+      else if(isOn){ cls+=' on'; color=col; }
+      dotsHtml += `<div class="${cls}" style="background:${isOn?color:'rgba(255,255,255,0.05)'};color:${color};border-color:${isOn?color:'rgba(255,255,255,0.06)'}"></div>`;
+    }
+
+    card.innerHTML = `
+      <div class="wc-top">
+        <div class="wc-name">${w.name}</div>
+        <div class="wc-rate" style="color:${col}">${rate.toFixed(0)}%</div>
+      </div>
+      <div class="bed-dots">${dotsHtml}</div>
+      <div class="wc-foot">
+        <span>${Math.round(w.simOcc)}/${w.cap} beds</span>
+        <span class="board">${w.boarding>0?`<span class="board-dot"></span>${w.boarding} boarding`:'no boarding'}</span>
+      </div>`;
+    el.appendChild(card);
+  });
+}
+
+/* ============================== FORECAST CHART (custom SVG) ============================== */
+function renderForecast(){
+  const svg=document.getElementById('forecastSvg');
+  svg.innerHTML='';
+  const W=760,H=300,padL=42,padR=20,padT=16,padB=34;
+  const allVals = HIST.map(d=>d.adm).concat(FORECAST.map(d=>d.hi));
+  const maxV = Math.max(...allVals)*1.12, minV=0;
+  const totalPoints = HIST.length + FORECAST.length;
+  const x = i => padL + (i/(totalPoints-1))*(W-padL-padR);
+  const y = v => padT + (1-(v-minV)/(maxV-minV))*(H-padT-padB);
+
+  // grid lines
+  for(let g=0; g<=4; g++){
+    const yy = padT + g*(H-padT-padB)/4;
+    const line=svgns('line');
+    line.setAttribute('x1',padL); line.setAttribute('x2',W-padR); line.setAttribute('y1',yy); line.setAttribute('y2',yy);
+    line.setAttribute('stroke','rgba(255,255,255,0.05)'); line.setAttribute('stroke-width','1');
+    svg.appendChild(line);
+    const val = Math.round(maxV - g*maxV/4);
+    const t=svgns('text'); t.setAttribute('x',6); t.setAttribute('y',yy+3); t.setAttribute('fill','#4C5568'); t.setAttribute('font-size','9');
+    t.textContent=val; svg.appendChild(t);
+  }
+
+  // CI band (behind everything)
+  const ciPts = FORECAST.map((d,i)=>({x:x(HIST.length+i), yHi:y(d.hi), yLo:y(d.lo)}));
+  let ciPath = `M ${ciPts[0].x} ${ciPts[0].yHi} `;
+  ciPts.forEach(p=> ciPath += `L ${p.x} ${p.yHi} `);
+  for(let i=ciPts.length-1;i>=0;i--) ciPath += `L ${ciPts[i].x} ${ciPts[i].yLo} `;
+  ciPath += 'Z';
+  const ciEl=svgns('path'); ciEl.setAttribute('d',ciPath); ciEl.setAttribute('fill','rgba(0,229,255,0.14)'); ciEl.setAttribute('stroke','none');
+  svg.appendChild(ciEl);
+
+  // elective surgery bars (secondary axis, behind lines)
+  const maxElective = Math.max(...FORECAST.map(d=>d.elective))*2.6;
+  FORECAST.forEach((d,i)=>{
+    const bw = (W-padL-padR)/(totalPoints-1)*0.5;
+    const bx = x(HIST.length+i)-bw/2;
+    const bh = (d.elective/maxElective)*(H-padT-padB);
+    const rect=svgns('rect');
+    rect.setAttribute('x',bx); rect.setAttribute('width',bw);
+    rect.setAttribute('y', H-padB-bh); rect.setAttribute('height',bh);
+    rect.setAttribute('fill','rgba(255,153,0,0.35)'); rect.setAttribute('rx',2);
+    svg.appendChild(rect);
+  });
+
+  // historical dotted line
+  let histPath='';
+  HIST.forEach((d,i)=>{ histPath += (i===0?'M':'L') + ` ${x(i)} ${y(d.adm)} `; });
+  const histEl=svgns('path'); histEl.setAttribute('d',histPath); histEl.setAttribute('fill','none');
+  histEl.setAttribute('stroke','#7C879C'); histEl.setAttribute('stroke-width','2'); histEl.setAttribute('stroke-dasharray','2 4');
+  svg.appendChild(histEl);
+
+  // connector between hist and forecast
+  const connEl=svgns('line');
+  connEl.setAttribute('x1',x(HIST.length-1)); connEl.setAttribute('y1',y(HIST[HIST.length-1].adm));
+  connEl.setAttribute('x2',x(HIST.length)); connEl.setAttribute('y2',y(FORECAST[0].fc));
+  connEl.setAttribute('stroke',COLORS.teal); connEl.setAttribute('stroke-width','2.5'); connEl.setAttribute('opacity','0.5');
+  svg.appendChild(connEl);
+
+  // forecast solid glowing line
+  let fcPath='';
+  FORECAST.forEach((d,i)=>{ fcPath += (i===0?'M':'L') + ` ${x(HIST.length+i)} ${y(d.fc)} `; });
+  const glow=svgns('path'); glow.setAttribute('d',fcPath); glow.setAttribute('fill','none');
+  glow.setAttribute('stroke',COLORS.teal); glow.setAttribute('stroke-width','7'); glow.setAttribute('opacity','0.25'); glow.setAttribute('stroke-linecap','round');
+  svg.appendChild(glow);
+  const fcEl=svgns('path'); fcEl.setAttribute('d',fcPath); fcEl.setAttribute('fill','none');
+  fcEl.setAttribute('stroke',COLORS.teal); fcEl.setAttribute('stroke-width','2.5'); fcEl.setAttribute('stroke-linecap','round');
+  svg.appendChild(fcEl);
+
+  FORECAST.forEach((d,i)=>{
+    const c=svgns('circle'); c.setAttribute('cx',x(HIST.length+i)); c.setAttribute('cy',y(d.fc)); c.setAttribute('r','3.5');
+    c.setAttribute('fill','#05070C'); c.setAttribute('stroke',COLORS.teal); c.setAttribute('stroke-width','2');
+    svg.appendChild(c);
+  });
+
+  // x-axis date labels (every ~5th)
+  const allDates = HIST.map(d=>d.date).concat(FORECAST.map(d=>d.date));
+  allDates.forEach((d,i)=>{
+    if(i%6!==0 && i!==allDates.length-1) return;
+    const t=svgns('text'); t.setAttribute('x',x(i)); t.setAttribute('y',H-10); t.setAttribute('fill','#4C5568');
+    t.setAttribute('font-size','9'); t.setAttribute('text-anchor','middle');
+    t.textContent = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    svg.appendChild(t);
+  });
+
+  // "today" marker
+  const todayX = x(HIST.length-1);
+  const todayLine=svgns('line'); todayLine.setAttribute('x1',todayX); todayLine.setAttribute('x2',todayX);
+  todayLine.setAttribute('y1',padT); todayLine.setAttribute('y2',H-padB);
+  todayLine.setAttribute('stroke','rgba(255,255,255,0.15)'); todayLine.setAttribute('stroke-dasharray','3 3');
+  svg.appendChild(todayLine);
+}
+
+/* ============================== ER GAUGE ============================== */
+function renderGauge(waitMins){
+  const svg=document.getElementById('gaugeSvg');
+  svg.innerHTML='';
+  const cx=110, cy=118, r=88;
+  const maxVal=240;
+
+  // theta measured in degrees along the TOP semicircle: 180=left, 90=top, 0=right
+  function pt(thetaDeg, rad){
+    const rad_ = thetaDeg*Math.PI/180;
+    return [cx+rad*Math.cos(rad_), cy-rad*Math.sin(rad_)];
+  }
+  function arcPath(theta0,theta1,rad){
+    const [x0,y0]=pt(theta0,rad), [x1,y1]=pt(theta1,rad);
+    const large = Math.abs(theta1-theta0)>180?1:0;
+    // sweep=0 draws the shorter way going clockwise on screen as theta decreases
+    return `M ${x0} ${y0} A ${rad} ${rad} 0 ${large} 0 ${x1} ${y1}`;
+  }
+  // value -> angle: 0 -> 180deg (left), maxVal -> 0deg (right)
+  const valToTheta = v => 180 - (Math.min(v,maxVal)/maxVal)*180;
+
+  const zones=[[0,90,COLORS.green],[90,150,COLORS.amber],[150,240,COLORS.red]];
+  zones.forEach(([a,b,color])=>{
+    const p=svgns('path'); p.setAttribute('d',arcPath(valToTheta(a),valToTheta(b),r)); p.setAttribute('stroke',color);
+    p.setAttribute('stroke-width','14'); p.setAttribute('fill','none'); p.setAttribute('opacity','0.28'); p.setAttribute('stroke-linecap','round');
+    svg.appendChild(p);
+  });
+
+  const thetaVal = valToTheta(waitMins);
+  const valArc=svgns('path'); valArc.setAttribute('d',arcPath(180,thetaVal,r));
+  valArc.setAttribute('stroke',COLORS.teal); valArc.setAttribute('stroke-width','8'); valArc.setAttribute('fill','none'); valArc.setAttribute('stroke-linecap','round');
+  valArc.style.filter='drop-shadow(0 0 6px '+COLORS.teal+')';
+  svg.appendChild(valArc);
+
+  // tick labels at 0 / 120 / 240
+  [0,120,240].forEach(v=>{
+    const [tx,ty]=pt(valToTheta(v), r+16);
+    const t=svgns('text'); t.setAttribute('x',tx); t.setAttribute('y',ty+3); t.setAttribute('fill','#4C5568');
+    t.setAttribute('font-size','9'); t.setAttribute('text-anchor','middle'); t.textContent=v;
+    svg.appendChild(t);
+  });
+
+  // needle
+  const needleLen=r-22;
+  const [nx,ny]=pt(thetaVal, needleLen);
+  const needle=svgns('line'); needle.setAttribute('x1',cx); needle.setAttribute('y1',cy);
+  needle.setAttribute('x2',nx); needle.setAttribute('y2',ny); needle.setAttribute('stroke','#fff'); needle.setAttribute('stroke-width','2.5'); needle.setAttribute('stroke-linecap','round');
+  svg.appendChild(needle);
+  const hub=svgns('circle'); hub.setAttribute('cx',cx); hub.setAttribute('cy',cy); hub.setAttribute('r','5.5'); hub.setAttribute('fill',COLORS.teal);
+  hub.style.filter='drop-shadow(0 0 5px '+COLORS.teal+')';
+  svg.appendChild(hub);
+
+  document.getElementById('gaugeRead').textContent = Math.round(waitMins);
+  document.getElementById('gaugeRead').style.color = waitMins>=150?COLORS.red : waitMins>=90?COLORS.amber : COLORS.teal;
+}
+
+/* ============================== FLOW PIPELINE ============================== */
+function renderFlow(){
+  const el=document.getElementById('flowStages');
+  const maxV = FLOW[0].val;
+  const colors=[COLORS.teal, '#5B8DEF', COLORS.amber, COLORS.green];
+  el.innerHTML = FLOW.map((f,i)=>`
+    <div class="flow-stage">
+      <div class="flow-label">${f.label}</div>
+      <div class="flow-bar-track">
+        <div class="flow-bar-fill" style="width:${(f.val/maxV*100)}%; background:linear-gradient(90deg, ${colors[i]}55, ${colors[i]}); box-shadow: 0 0 14px ${colors[i]}55;">
+          ${f.val}
+        </div>
+      </div>
+    </div>`).join('');
+
+  const bEl=document.getElementById('bottleneckBars');
+  const maxHrs = Math.max(...BOTTLENECKS.map(b=>b.hrs));
+  bEl.innerHTML = BOTTLENECKS.map(b=>{
+    const col = b.hrs===maxHrs ? COLORS.amber : COLORS.teal;
+    return `<div class="flow-stage" style="margin-bottom:10px;">
+      <div class="flow-label" style="width:140px;">${b.stage}</div>
+      <div class="flow-bar-track" style="height:22px;">
+        <div class="flow-bar-fill" style="height:22px; width:${(b.hrs/maxHrs*100)}%; background:linear-gradient(90deg, ${col}44, ${col}); box-shadow:0 0 10px ${col}55; font-size:10.5px;">${b.hrs}h</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ============================== SCENARIO ENGINE ============================== */
+function recompute(){
+  const mci = parseInt(document.getElementById('mciSlider').value);
+  const dv = parseInt(document.getElementById('dvSlider').value);
+  document.getElementById('mciVal').textContent = '+'+mci;
+  document.getElementById('dvVal').textContent = (dv>=0?'+':'')+dv+'%';
+  document.getElementById('mciSlider').style.setProperty('--fill', (mci/50*100)+'%');
+  document.getElementById('dvSlider').style.setProperty('--fill', ((dv+20)/40*100)+'%');
+
+  const totalWeight = Object.values(MCI_WEIGHT).reduce((a,b)=>a+b,0);
+  let totalCap=0, totalSimOcc=0;
+  const simWards = WARDS.map(w=>{
+    const mciAlloc = Math.round(mci*(MCI_WEIGHT[w.name]/totalWeight));
+    const relief = Math.round(w.occ*0.12*(dv/100));
+    const simOcc = Math.max(0, w.occ + mciAlloc - relief);
+    totalCap+=w.cap; totalSimOcc+=simOcc;
+    return {...w, simOcc};
+  });
+
+  const sysRate = totalSimOcc/totalCap*100;
+  const icuW = simWards.find(w=>w.name==='ICU');
+  const icuRate = icuW.simOcc/icuW.cap*100;
+  const boarding = WARDS.reduce((a,w)=>a+w.boarding,0);
+  const redCount = WARDS.reduce((a,w)=>a+w.red,0);
+  const queueDensity = WARDS.reduce((a,w)=>a+w.red+w.amber+w.green,0);
+  const avgWait = WARDS.reduce((a,w)=>a+w.wait,0)/WARDS.length;
+
+  renderKPIs(sysRate, totalSimOcc, totalCap, icuRate, boarding);
+  renderMatrix(simWards);
+
+  document.getElementById('boardingN').textContent = boarding;
+  document.getElementById('queueN').textContent = queueDensity;
+  document.getElementById('redN').textContent = redCount;
+
+  // status banner + scenario card + pulse
+  let statusTxt, statusColor;
+  if(sysRate>=95){ statusTxt='⚠️ CRITICAL OVER-CAPACITY ALERT'; statusColor=COLORS.red; }
+  else if(sysRate>=85){ statusTxt='⚠️ ELEVATED CAPACITY WARNING'; statusColor=COLORS.amber; }
+  else { statusTxt='✅ STATUS NORMAL'; statusColor=COLORS.green; }
+
+  const pill=document.getElementById('statusPill');
+  pill.style.borderColor=statusColor; pill.style.color=statusColor; pill.style.background=statusColor+'14';
+  document.getElementById('statusText').textContent = statusTxt;
+  document.getElementById('pulseDot').style.background=statusColor; document.getElementById('pulseDot').style.color=statusColor;
+
+  const card=document.getElementById('scenarioCard');
+  card.textContent = statusTxt + `  (system ${sysRate.toFixed(1)}%)`;
+  card.style.borderColor=statusColor; card.style.color=statusColor; card.style.background=statusColor+'14';
+
+  // compare bars
+  const cEl=document.getElementById('compareBars');
+  cEl.innerHTML = simWards.map(w=>{
+    const baseRate = w.occ/w.cap*100;
+    const simRate = w.simOcc/w.cap*100;
+    const col = occColor(simRate);
+    return `<div class="cbar-row">
+      <div class="cbar-name">${w.name}</div>
+      <div class="cbar-track">
+        <div class="cbar-base" style="width:${Math.min(baseRate,100)}%;"></div>
+        <div class="cbar-sim" style="width:${Math.min(simRate,100)}%; background:${col}; color:${col};"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderGauge(avgWait);
+}
+
+document.getElementById('mciSlider').addEventListener('input', recompute);
+document.getElementById('dvSlider').addEventListener('input', recompute);
+
+/* ============================== INIT ============================== */
+renderForecast();
+renderFlow();
+recompute();
+</script>
+</body>
+</html>
